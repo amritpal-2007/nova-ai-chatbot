@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Nova AI</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-top">
+
+            <button class="new-chat-btn" onclick="newChat()">
+                <span>＋</span>
+                <span>New chat</span>
+            </button>
+
+            <div class="history-title">
+                Recent
+            </div>
+
+            <div class="chat-history" id="chatHistory">
+                <!-- Saved chats appear here -->
+            </div>
+
+        </div>
+
+
+        <div class="sidebar-bottom">
+
+            <button class="sidebar-option">
+                ⚙️ Settings
+            </button>
+
+            <div class="profile">
+
+                <div class="profile-avatar">
+                    A
+                </div>
+
+                <div class="profile-info">
+                    <strong>User</strong>
+                    <span>AI Developer</span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <header class="topbar">
+
+            <button
+                class="menu-button"
+                onclick="toggleSidebar()"
+            >
+                ☰
+            </button>
+
+            <div class="model-title">
+                <strong>Nova AI</strong>
+                <span>Gemini</span>
+            </div>
+
+            <div class="online-status">
+                <span class="status-dot"></span>
+                Online
+            </div>
+
+        </header>
+
+
+        <!-- CHAT AREA -->
+        <section class="chat-box" id="chatBox">
+
+            <div class="welcome" id="welcome">
+
+                <div class="welcome-logo">
+                    ✦
+                </div>
+
+                <h1>How can I help you today?</h1>
+
+                <p>
+                    Ask questions, learn something new,
+                    or build something with AI.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- PROMPT -->
+        <section class="composer">
+
+            <div class="prompt-box">
+
+                <input
+                    type="text"
+                    id="message"
+                    placeholder="Message Nova..."
+                    autocomplete="off"
+                >
+
+                <button
+                    id="sendButton"
+                    onclick="sendMessage()"
+                >
+                    ➜
+                </button>
+
+            </div>
+
+            <p class="disclaimer">
+                Nova can make mistakes. Check important information.
+            </p>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<script>
+
+let currentChatId = null;
+
+
+/* =========================
+   SEND MESSAGE
+========================= */
+
+async function sendMessage() {
+
+    const input =
+        document.getElementById("message");
+
+    const chatBox =
+        document.getElementById("chatBox");
+
+    const sendButton =
+        document.getElementById("sendButton");
+
+    const message =
+        input.value.trim();
+
+
+    if (message === "") {
+        return;
+    }
+
+
+    const welcome =
+        document.getElementById("welcome");
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+
+    // USER MESSAGE
+    const userRow =
+        document.createElement("div");
+
+    userRow.className =
+        "message-row user-row";
+
+
+    const userBubble =
+        document.createElement("div");
+
+    userBubble.className =
+        "message user-message";
+
+    userBubble.innerText =
+        message;
+
+
+    userRow.appendChild(
+        userBubble
+    );
+
+    chatBox.appendChild(
+        userRow
+    );
+
+
+    input.value = "";
+
+    input.focus();
+
+    scrollToBottom();
+
+
+    // AI THINKING
+    const aiRow =
+        document.createElement("div");
+
+    aiRow.className =
+        "message-row ai-row";
+
+
+    const aiBubble =
+        document.createElement("div");
+
+    aiBubble.className =
+        "message ai-message thinking";
+
+
+    aiBubble.innerHTML = `
+        <span class="thinking-dot"></span>
+        <span class="thinking-dot"></span>
+        <span class="thinking-dot"></span>
+    `;
+
+
+    aiRow.appendChild(
+        aiBubble
+    );
+
+    chatBox.appendChild(
+        aiRow
+    );
+
+
+    sendButton.innerText =
+        "•••";
+
+
+    scrollToBottom();
+
+
+    try {
+
+        const response =
+            await fetch("/chat", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    message: message,
+                    chat_id: currentChatId
+                })
+
+            });
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.reply || "Request failed"
+            );
+
+        }
+
+
+        aiBubble
+            .classList
+            .remove("thinking");
+
+
+        aiBubble.innerText =
+            data.reply;
+
+
+        currentChatId =
+            data.chat_id;
+
+
+        await loadChats();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Chat error:",
+            error
+        );
+
+
+        aiBubble
+            .classList
+            .remove("thinking");
+
+
+        aiBubble.innerText =
+            "Something went wrong. Please try again.";
+
+    }
+
+    finally {
+
+        sendButton.innerText =
+            "➜";
+
+
+        input.focus();
+
+        scrollToBottom();
+
+    }
+
+}
+
+
+/* =========================
+   NEW CHAT
+========================= */
+
+async function newChat() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/new-chat",
+                {
+                    method: "POST"
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        currentChatId =
+            data.chat_id;
+
+
+        showWelcomeScreen();
+
+
+        document
+            .getElementById("message")
+            .value = "";
+
+
+        document
+            .getElementById("message")
+            .focus();
+
+
+        await loadChats();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "New chat error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================
+   LOAD CHAT HISTORY
+========================= */
+
+async function loadChats() {
+
+    try {
+
+        const response =
+            await fetch("/chats");
+
+
+        const chats =
+            await response.json();
+
+
+        const history =
+            document.getElementById(
+                "chatHistory"
+            );
+
+
+        history.innerHTML = "";
+
+
+        chats
+            .reverse()
+            .forEach(chat => {
+
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                item.className =
+                    "history-item";
+
+
+                if (
+                    chat.id ===
+                    currentChatId
+                ) {
+
+                    item
+                        .classList
+                        .add("active");
+
+                }
+
+
+                const mainButton =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                mainButton.className =
+                    "history-main";
+
+
+                mainButton.innerHTML = `
+                    <span class="history-icon">
+                        💬
+                    </span>
+
+                    <span class="history-text">
+                        ${escapeHtml(chat.title)}
+                    </span>
+                `;
+
+
+                mainButton.onclick =
+                    function () {
+
+                        openChat(
+                            chat.id
+                        );
+
+                    };
+
+
+                const menuButton =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                menuButton.className =
+                    "chat-menu-button";
+
+
+                menuButton.innerText =
+                    "⋯";
+
+
+                menuButton.onclick =
+                    function (event) {
+
+                        showChatMenu(
+                            event,
+                            chat.id
+                        );
+
+                    };
+
+
+                item.appendChild(
+                    mainButton
+                );
+
+                item.appendChild(
+                    menuButton
+                );
+
+
+                history.appendChild(
+                    item
+                );
+
+            });
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Load chats error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================
+   OPEN CHAT
+========================= */
+
+async function openChat(chatId) {
+
+    try {
+
+        const response =
+            await fetch(
+                `/chat/${chatId}`
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Chat not found"
+            );
+
+        }
+
+
+        const chat =
+            await response.json();
+
+
+        currentChatId =
+            chatId;
+
+
+        const chatBox =
+            document.getElementById(
+                "chatBox"
+            );
+
+
+        chatBox.innerHTML =
+            "";
+
+
+        chat.messages.forEach(
+            item => {
+
+
+                const row =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                const bubble =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                if (
+                    item.role ===
+                    "user"
+                ) {
+
+                    row.className =
+                        "message-row user-row";
+
+
+                    bubble.className =
+                        "message user-message";
+
+                }
+
+                else {
+
+                    row.className =
+                        "message-row ai-row";
+
+
+                    bubble.className =
+                        "message ai-message";
+
+                }
+
+
+                bubble.innerText =
+                    item.text;
+
+
+                row.appendChild(
+                    bubble
+                );
+
+
+                chatBox.appendChild(
+                    row
+                );
+
+            });
+
+
+        scrollToBottom();
+
+
+        await loadChats();
+
+
+        document
+            .getElementById("message")
+            .focus();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Open chat error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================
+   CHAT OPTIONS MENU
+========================= */
+
+function showChatMenu(
+    event,
+    chatId
+) {
+
+    event.stopPropagation();
+
+
+    closeMenus();
+
+
+    const button =
+        event.currentTarget;
+
+
+    const parent =
+        button.parentElement;
+
+
+    const menu =
+        document.createElement(
+            "div"
+        );
+
+
+    menu.className =
+        "chat-popup-menu";
+
+
+    const renameButton =
+        document.createElement(
+            "button"
+        );
+
+
+    renameButton.innerText =
+        "✏️ Rename";
+
+
+    renameButton.onclick =
+        function (event) {
+
+            renameChat(
+                event,
+                chatId
+            );
+
+        };
+
+
+    const deleteButton =
+        document.createElement(
+            "button"
+        );
+
+
+    deleteButton.className =
+        "delete-option";
+
+
+    deleteButton.innerText =
+        "🗑️ Delete";
+
+
+    deleteButton.onclick =
+        function (event) {
+
+            deleteChat(
+                event,
+                chatId
+            );
+
+        };
+
+
+    menu.appendChild(
+        renameButton
+    );
+
+    menu.appendChild(
+        deleteButton
+    );
+
+
+    parent.appendChild(
+        menu
+    );
+
+}
+
+
+/* =========================
+   RENAME CHAT
+========================= */
+
+async function renameChat(
+    event,
+    chatId
+) {
+
+    event.stopPropagation();
+
+
+    const newTitle =
+        prompt(
+            "Enter new chat name:"
+        );
+
+
+    if (newTitle === null) {
+        return;
+    }
+
+
+    const title =
+        newTitle.trim();
+
+
+    if (title === "") {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/rename-chat/${chatId}`,
+                {
+
+                    method: "PUT",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            title: title
+                        })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Rename failed"
+            );
+
+        }
+
+
+        await loadChats();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Rename error:",
+            error
+        );
+
+
+        alert(
+            "Could not rename chat."
+        );
+
+    }
+
+}
+
+
+/* =========================
+   DELETE CHAT
+========================= */
+
+async function deleteChat(
+    event,
+    chatId
+) {
+
+    event.stopPropagation();
+
+
+    const confirmed =
+        confirm(
+            "Delete this chat?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/chat/${chatId}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Delete failed"
+            );
+
+        }
+
+
+        if (
+            currentChatId ===
+            chatId
+        ) {
+
+            currentChatId =
+                null;
+
+
+            showWelcomeScreen();
+
+        }
+
+
+        await loadChats();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Delete chat error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================
+   WELCOME SCREEN
+========================= */
+
+function showWelcomeScreen() {
+
+    const chatBox =
+        document.getElementById(
+            "chatBox"
+        );
+
+
+    chatBox.innerHTML = `
+
+        <div
+            class="welcome"
+            id="welcome"
+        >
+
+            <div class="welcome-logo">
+                ✦
+            </div>
+
+            <h1>
+                How can I help you today?
+            </h1>
+
+            <p>
+                Ask questions,
+                learn something new,
+                or build something with AI.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================
+   MOBILE SIDEBAR
+========================= */
+
+function toggleSidebar() {
+
+    document
+        .getElementById(
+            "sidebar"
+        )
+        .classList
+        .toggle("open");
+
+}
+
+
+/* =========================
+   SCROLL
+========================= */
+
+function scrollToBottom() {
+
+    const chatBox =
+        document.getElementById(
+            "chatBox"
+        );
+
+
+    chatBox.scrollTop =
+        chatBox.scrollHeight;
+
+}
+
+
+/* =========================
+   ESCAPE HTML
+========================= */
+
+function escapeHtml(text) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+
+    div.innerText =
+        text;
+
+
+    return div.innerHTML;
+
+}
+
+
+/* =========================
+   CLOSE MENUS
+========================= */
+
+function closeMenus() {
+
+    document
+        .querySelectorAll(
+            ".chat-popup-menu"
+        )
+        .forEach(
+            menu => menu.remove()
+        );
+
+}
+
+
+document.addEventListener(
+    "click",
+    function () {
+
+        closeMenus();
+
+    }
+);
+
+
+/* =========================
+   ENTER TO SEND
+========================= */
+
+document
+    .getElementById(
+        "message"
+    )
+    .addEventListener(
+        "keydown",
+        function(event) {
+
+            if (
+                event.key ===
+                "Enter"
+            ) {
+
+                event.preventDefault();
+
+                sendMessage();
+
+            }
+
+        }
+    );
+
+
+/* =========================
+   START
+========================= */
+
+loadChats();
+
+
+document
+    .getElementById(
+        "message"
+    )
+    .focus();
+
+</script>
+
+</body>
+</html>
